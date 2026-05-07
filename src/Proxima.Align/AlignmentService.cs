@@ -38,9 +38,10 @@ internal static class AlignmentService
             return null;
 
         var operatorRegex = BuildOperatorRegex(settings.EnabledOperators);
+        int tabSize       = settings.TabSize > 0 ? settings.TabSize : 4;
 
         var parsed = lines
-            .Select(line => ParseLine(line, operatorRegex, settings.AlignComments))
+            .Select(line => ParseLine(line, operatorRegex, settings.AlignComments, tabSize))
             .ToArray();
 
         var withOperator = parsed.Where(p => p.Operator is not null).ToList();
@@ -48,21 +49,10 @@ internal static class AlignmentService
         if (withOperator.Count < 2)
             return null;
 
-        // La colonna target dell'operatore è il MAX di (lunghezza sinistra + spazi prima)
-        // su tutte le righe del blocco.
-        //
-        // Questo garantisce:
-        //  - Se le righe sono già allineate alla stessa colonna → quella colonna viene mantenuta.
-        //  - Se una riga ha la parte sinistra più lunga → le altre vengono portate alla sua colonna.
-        //
-        // Esempio:
-        //   "var a  +="  → left=5, spaces=2  → col=7
-        //   "var b1 ="   → left=6, spaces=1  → col=7   ← già alla stessa colonna, si mantiene
-        //   "var b2 ="   → left=6, spaces=1  → col=7
-        //
-        // Risultato: operatorColumn=7, tutte rimangono invariate.
+        // La colonna target (visiva) è il MAX tra tutte le righe che hanno un operatore.
+        // Usa colonne visive così i tab vengono espansi correttamente.
         int operatorColumn = withOperator.Max(p =>
-            p.Left!.TrimEnd().Length +
+            p.LeftVisualWidth +
             (settings.SpaceBeforeOperator ? Math.Max(1, p.SpacesBefore) : 0));
 
         // Spazi dopo l'operatore: prendi il massimo trovato nel blocco
@@ -82,10 +72,14 @@ internal static class AlignmentService
                 continue;
             }
 
+            // leftTrimmed = testo a sinistra dell'operatore senza spazi finali
             var leftTrimmed = p.Left!.TrimEnd();
 
-            // Spazi necessari per portare l'operatore alla colonna target
-            int spacesNeeded = operatorColumn - leftTrimmed.Length;
+            // Ricalcola la larghezza visiva dopo il trim (i tab iniziali rimangono)
+            int leftVisual  = VisualWidth(leftTrimmed, tabSize);
+
+            // Spazi (sempre space, mai tab) necessari per arrivare alla colonna target
+            int spacesNeeded = operatorColumn - leftVisual;
             var beforePadding = new string(' ', Math.Max(settings.SpaceBeforeOperator ? 1 : 0, spacesNeeded));
 
             result[i] = $"{leftTrimmed}{beforePadding}{p.Operator}{paddingAfter}{p.Right}";
@@ -94,7 +88,23 @@ internal static class AlignmentService
         return result;
     }
 
-    private static ParsedLine ParseLine(string line, Regex operatorRegex, bool alignComments)
+    /// <summary>
+    /// Calcola la larghezza visiva di una stringa tenendo conto dei tab.
+    /// </summary>
+    private static int VisualWidth(string text, int tabSize)
+    {
+        int col = 0;
+        foreach (char ch in text)
+        {
+            if (ch == '\t')
+                col += tabSize - (col % tabSize);
+            else
+                col++;
+        }
+        return col;
+    }
+
+    private static ParsedLine ParseLine(string line, Regex operatorRegex, bool alignComments, int tabSize)
     {
         string matchTarget = line;
         string? trailingComment = null;
@@ -111,29 +121,34 @@ internal static class AlignmentService
 
         var match = operatorRegex.Match(matchTarget);
         if (!match.Success)
-            return new ParsedLine(line, null, 0, null, 0, null);
+            return new ParsedLine(line, null, 0, 0, null, 0, null);
 
-        // Gruppo 4 = spazi dopo operatore + valore destro — separati
-        var rawRight = match.Groups[4].Value;
+        var leftRaw     = match.Groups[1].Value;   // include trailing spaces
+        var spacesBefore = match.Groups[2].Value.Length;
+        var leftVisual  = VisualWidth(leftRaw.TrimEnd(), tabSize);
+
+        var rawRight    = match.Groups[4].Value;
         var spacesAfter = rawRight.Length - rawRight.TrimStart().Length;
-        var rightValue = rawRight.TrimStart() + (trailingComment ?? "");
+        var rightValue  = rawRight.TrimStart() + (trailingComment ?? "");
 
         return new ParsedLine(
-            Original: line,
-            Left: match.Groups[1].Value,
-            SpacesBefore: match.Groups[2].Value.Length,
-            Operator: match.Groups[3].Value,
-            SpacesAfter: spacesAfter,
-            Right: rightValue);
+            Original:        line,
+            Left:            leftRaw,
+            SpacesBefore:    spacesBefore,
+            LeftVisualWidth: leftVisual,
+            Operator:        match.Groups[3].Value,
+            SpacesAfter:     spacesAfter,
+            Right:           rightValue);
     }
 
     private record ParsedLine
     (
-        string Original,
+        string  Original,
         string? Left,
-        int SpacesBefore,
+        int     SpacesBefore,
+        int     LeftVisualWidth,
         string? Operator,
-        int SpacesAfter,
+        int     SpacesAfter,
         string? Right
     );
 }
