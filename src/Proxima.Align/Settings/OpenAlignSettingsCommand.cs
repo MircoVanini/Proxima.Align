@@ -15,6 +15,7 @@ internal sealed class OpenAlignSettingsCommand : Command
             // Solo Tools menu come placement diretto; Extensions viene da ProximaAlignMenu.Children
             Placements = [CommandPlacement.KnownPlacements.ToolsMenu],
             Icon       = new(ImageMoniker.KnownValues.Settings, IconSettings.IconAndText),
+            Shortcuts  = null,
         };
 
     public override CommandConfiguration CommandConfiguration => _commandConfiguration;
