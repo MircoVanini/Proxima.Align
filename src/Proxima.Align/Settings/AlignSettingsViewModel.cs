@@ -7,12 +7,23 @@ using System.Text;
 
 namespace Proxima.Align;
 
+/// <summary>
+/// View model for the alignment settings tool window, providing data-bindable properties
+/// for operator alignment configuration, spacing options, theme colors, and commands.
+/// </summary>
+/// <remarks>
+/// This view model manages the state of alignment settings including:
+/// - Individual toggles for supported operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>)
+/// - Spacing configuration before and after operators
+/// - Theme-aware color properties for UI rendering
+/// - Save and Restore command implementations
+/// The view model is serializable via data contract and implements property change notifications
+/// for data binding in the Visual Studio Extensibility UI framework.
+/// </remarks>
 [DataContract]
 internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
 {
     private readonly AlignSettingsService _service;
-
-    // ── Operator toggles ──────────────────────────────────────────────────────
 
     private bool _opAssign;
     private bool _opPlusEq;
@@ -40,15 +51,11 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     [DataMember] public bool OpShrEq { get => _opShrEq; set => SetProperty(ref _opShrEq, value); }
     [DataMember] public bool OpArrow { get => _opArrow; set => SetProperty(ref _opArrow, value); }
 
-    // ── General options ───────────────────────────────────────────────────────
-
     private bool _spaceBefore;
     private bool _spaceAfter;
 
     [DataMember] public bool SpaceBefore { get => _spaceBefore; set => SetProperty(ref _spaceBefore, value); }
     [DataMember] public bool SpaceAfter { get => _spaceAfter; set => SetProperty(ref _spaceAfter, value); }
-
-    // ── Theme colors (read-only, computed once at construction) ───────────────
 
     [DataMember] public bool IsDarkTheme { get; }
     [DataMember] public string ColorForeground { get; }
@@ -61,13 +68,13 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     [DataMember] public string ColorBtnBg { get; }
     [DataMember] public string ColorBtnBorder { get; }
 
-    // ── Commands ──────────────────────────────────────────────────────────────
-
     [DataMember] public AsyncCommand SaveCommand { get; }
     [DataMember] public AsyncCommand RestoreCommand { get; }
 
-    // ── Ctor ──────────────────────────────────────────────────────────────────
-
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AlignSettingsViewModel"/> class.
+    /// </summary>
+    /// <param name="service">The alignment settings service used to load and save configuration.</param>
     public AlignSettingsViewModel(AlignSettingsService service)
     {
         _service = service;
@@ -104,8 +111,11 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
         RestoreCommand = new AsyncCommand(ExecuteRestoreAsync);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
+    /// <summary>
+    /// Loads operator and spacing settings from an <see cref="AlignSettings"/> instance
+    /// into the view model properties.
+    /// </summary>
+    /// <param name="s">The settings object to load from.</param>
     private void LoadFromSettings(AlignSettings s)
     {
         OpAssign    = s.EnabledOperators.Contains("=");
@@ -124,6 +134,10 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
         SpaceAfter  = s.SpaceAfterOperator;
     }
 
+    /// <summary>
+    /// Converts the current view model state into an <see cref="AlignSettings"/> instance.
+    /// </summary>
+    /// <returns>A new <see cref="AlignSettings"/> object containing the current operator and spacing configuration.</returns>
     private AlignSettings ToSettings()
     {
         var ops = new List<string>();
@@ -148,44 +162,27 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
         };
     }
 
+    /// <summary>
+    /// Executes the save command, persisting the current view model settings to storage.
+    /// </summary>
+    /// <param name="parameter">Optional command parameter (unused).</param>
+    /// <param name="ct">Cancellation token for async operation.</param>
+    /// <returns>A completed task.</returns>
     private Task ExecuteSaveAsync(object? parameter, CancellationToken ct)
     {
         _service.Save(ToSettings());
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Executes the restore command, resetting all settings to their default values.
+    /// </summary>
+    /// <param name="parameter">Optional command parameter (unused).</param>
+    /// <param name="ct">Cancellation token for async operation.</param>
+    /// <returns>A completed task.</returns>
     private Task ExecuteRestoreAsync(object? parameter, CancellationToken ct)
     {
         LoadFromSettings(new AlignSettings());
         return Task.CompletedTask;
-    }
-
-    
-    private static void SearchKeyRecursive(RegistryKey key, string path, StringBuilder sb,
-        int depth, int maxDepth, Func<string, bool> filter)
-    {
-        if (depth > maxDepth) return;
-
-        // Controlla i valori di questa chiave
-        foreach (var valueName in key.GetValueNames())
-        {
-            if (filter(valueName) || filter(key.GetValue(valueName)?.ToString() ?? ""))
-            {
-                var val = key.GetValue(valueName);
-                sb.AppendLine($"  {path}\\{valueName} = {val}");
-            }
-        }
-
-        // Ricerca nei sotto-nomi
-        foreach (var subName in key.GetSubKeyNames())
-        {
-            try
-            {
-                using var sub = key.OpenSubKey(subName);
-                if (sub != null)
-                    SearchKeyRecursive(sub, $"{path}\\{subName}", sb, depth + 1, maxDepth, filter);
-            }
-            catch { }
-        }
-    }
+    }    
 }

@@ -3,11 +3,9 @@
 
     <DataTemplate.Resources>
 
-        <!-- ── CheckBox ControlTemplate completo (nessun SystemColor) ── -->
         <ControlTemplate x:Key="CheckBoxTemplate" TargetType="CheckBox">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent">
 
-                <!-- Box grafico -->
                 <Border x:Name="Box"
                         Width="13" Height="13"
                         BorderThickness="1"
@@ -15,7 +13,6 @@
                         Background="{Binding ColorBoxBg}"
                         VerticalAlignment="Center" Margin="0,0,5,0">
 
-                    <!-- Segno di spunta -->
                     <Path x:Name="Checkmark"
                           Data="M 1,5 L 4.5,8.5 L 10,2"
                           Stroke="{Binding ColorBoxCheck}"
@@ -24,7 +21,6 @@
                           SnapsToDevicePixels="True"/>
                 </Border>
 
-                <!-- Label -->
                 <ContentPresenter VerticalAlignment="Center"
                                   RecognizesAccessKey="True"/>
             </StackPanel>
@@ -82,16 +78,13 @@
 
     </DataTemplate.Resources>
 
-    <!-- Root: sfondo pieno legato al ViewModel -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12"
                   Background="{Binding ColorBackground}">
         <StackPanel>
 
-            <!-- Titolo -->
             <TextBlock FontSize="14" FontWeight="Bold" Margin="0,0,0,12"
                        Text="Proxima Align – Settings"/>
 
-            <!-- Operatori -->
             <GroupBox Header="Operators to align" Margin="0,0,0,12" Padding="8">
                 <WrapPanel>
                     <CheckBox Content="="          IsChecked="{Binding OpAssign}"  Margin="4"/>
@@ -109,17 +102,6 @@
                 </WrapPanel>
             </GroupBox>
 
-            <!-- Opzioni generali --><!--
-            <GroupBox Header="General options" Margin="0,0,0,12" Padding="8">
-                <StackPanel>
-                    <CheckBox Content="Enable automatic alignment on save"
-                              IsChecked="{Binding AutoAlign}"     Margin="0,4"/>
-                    <CheckBox Content="Align trailing comments (//)"
-                              IsChecked="{Binding AlignComments}" Margin="0,4"/>
-                </StackPanel>
-            </GroupBox>-->
-
-            <!-- Spaziatura -->
             <GroupBox Header="Spacing around operator" Margin="0,0,0,12" Padding="8">
                 <StackPanel>
                     <CheckBox Content="Space before operator"
@@ -129,7 +111,6 @@
                 </StackPanel>
             </GroupBox>
 
-            <!-- Bottoni -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                 <Button Content="Restore defaults"
                         Command="{Binding RestoreCommand}"

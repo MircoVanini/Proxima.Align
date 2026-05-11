@@ -2,8 +2,15 @@ using System.Text.RegularExpressions;
 
 namespace Proxima.Align;
 
+/// <summary>
+/// Provides services for aligning assignment and other operators across multiple lines of code.
+/// </summary>
 internal static class AlignmentService
 {
+    /// <summary>
+    /// All supported operators for alignment, ordered by precedence for matching.
+    /// Compound assignment operators are listed before simple assignment to ensure correct matching.
+    /// </summary>
     private static readonly string[] AllOperators =
     [
         "=>", "<<=", ">>=",
@@ -12,13 +19,19 @@ internal static class AlignmentService
         "="
     ];
 
+    /// <summary>
+    /// Regular expression for matching line comments (// style) to the end of a line.
+    /// </summary>
     private static readonly Regex LineCommentRegex = new(@"//.*$", RegexOptions.Compiled);
 
     /// <summary>
-    /// Regex con 4 gruppi:
-    ///   (1) parte sinistra  (2) spazi prima dell'operatore
-    ///   (3) operatore       (4) resto dopo l'operatore
+    /// Builds a regular expression to match operators on a line.
+    /// Regex with 4 groups:
+    ///   (1) left part  (2) spaces before the operator
+    ///   (3) operator   (4) remainder after the operator
     /// </summary>
+    /// <param name="enabledOperators">The collection of operators that should be matched.</param>
+    /// <returns>A compiled regular expression that matches the enabled operators, or a never-matching regex if no operators are enabled.</returns>
     private static Regex BuildOperatorRegex(IEnumerable<string> enabledOperators)
     {
         var ordered = AllOperators.Where(enabledOperators.Contains).ToList();
@@ -32,6 +45,15 @@ internal static class AlignmentService
         return new Regex(pattern, RegexOptions.Compiled);
     }
 
+    /// <summary>
+    /// Aligns operators across multiple lines of code by adding appropriate spacing.
+    /// </summary>
+    /// <param name="lines">The lines of code to align.</param>
+    /// <param name="settings">Settings that control alignment behavior, including which operators to align and spacing preferences.</param>
+    /// <returns>
+    /// An array of aligned lines if alignment is possible (at least 2 lines with operators found),
+    /// or <c>null</c> if alignment cannot be performed (empty input or fewer than 2 lines with operators).
+    /// </returns>
     public static string[]? AlignOperators(string[] lines, AlignSettings settings)
     {
         if (lines.Length == 0)
@@ -49,13 +71,13 @@ internal static class AlignmentService
         if (withOperator.Count < 2)
             return null;
 
-        // La colonna target (visiva) è il MAX tra tutte le righe che hanno un operatore.
-        // Usa colonne visive così i tab vengono espansi correttamente.
+        // The target (visual) column is the MAX among all lines that have an operator.
+        // Use visual columns so tabs are expanded correctly.
         int operatorColumn = withOperator.Max(p =>
             p.LeftVisualWidth +
             (settings.SpaceBeforeOperator ? Math.Max(1, p.SpacesBefore) : 0));
 
-        // Spazi dopo l'operatore: prendi il massimo trovato nel blocco
+        // Spaces after the operator: take the maximum found in the block
         int maxSpacesAfter = settings.SpaceAfterOperator
             ? Math.Max(1, withOperator.Max(p => p.SpacesAfter))
             : 0;
@@ -72,13 +94,13 @@ internal static class AlignmentService
                 continue;
             }
 
-            // leftTrimmed = testo a sinistra dell'operatore senza spazi finali
+            // leftTrimmed = text to the left of the operator without trailing spaces
             var leftTrimmed = p.Left!.TrimEnd();
 
-            // Ricalcola la larghezza visiva dopo il trim (i tab iniziali rimangono)
+            // Recalculate the visual width after trim (initial tabs remain)
             int leftVisual  = VisualWidth(leftTrimmed, tabSize);
 
-            // Spazi (sempre space, mai tab) necessari per arrivare alla colonna target
+            // Spaces (always space, never tab) needed to reach the target column
             int spacesNeeded = operatorColumn - leftVisual;
             var beforePadding = new string(' ', Math.Max(settings.SpaceBeforeOperator ? 1 : 0, spacesNeeded));
 
@@ -90,7 +112,11 @@ internal static class AlignmentService
 
     /// <summary>
     /// Calcola la larghezza visiva di una stringa tenendo conto dei tab.
+    /// Each tab character advances to the next tab stop position based on the specified tab size.
     /// </summary>
+    /// <param name="text">The text to measure.</param>
+    /// <param name="tabSize">The number of spaces per tab stop.</param>
+    /// <returns>The visual column position after rendering the text.</returns>
     private static int VisualWidth(string text, int tabSize)
     {
         int col = 0;
@@ -104,6 +130,15 @@ internal static class AlignmentService
         return col;
     }
 
+    /// <summary>
+    /// Parses a single line of code to extract operator and spacing information.
+    /// Handles line comments by optionally excluding them from operator matching.
+    /// </summary>
+    /// <param name="line">The line of code to parse.</param>
+    /// <param name="operatorRegex">The regular expression to use for matching operators.</param>
+    /// <param name="alignComments">If <c>false</c>, operators within line comments are ignored.</param>
+    /// <param name="tabSize">The tab size for calculating visual width.</param>
+    /// <returns>A <see cref="ParsedLine"/> record containing the parsed components and metadata.</returns>
     private static ParsedLine ParseLine(string line, Regex operatorRegex, bool alignComments, int tabSize)
     {
         string matchTarget = line;
@@ -141,6 +176,16 @@ internal static class AlignmentService
             Right:           rightValue);
     }
 
+    /// <summary>
+    /// Represents a parsed line of code containing information about an operator and surrounding content.
+    /// </summary>
+    /// <param name="Original">The original unmodified line.</param>
+    /// <param name="Left">The content to the left of the operator, including any trailing spaces. <c>null</c> if no operator found.</param>
+    /// <param name="SpacesBefore">The number of spaces immediately before the operator.</param>
+    /// <param name="LeftVisualWidth">The visual width of the left content (excluding trailing spaces) accounting for tabs.</param>
+    /// <param name="Operator">The matched operator. <c>null</c> if no operator found.</param>
+    /// <param name="SpacesAfter">The number of spaces immediately after the operator.</param>
+    /// <param name="Right">The content to the right of the operator (after leading spaces are trimmed), including any trailing comment. <c>null</c> if no operator found.</param>
     private record ParsedLine
     (
         string  Original,
