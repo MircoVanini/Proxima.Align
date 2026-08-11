@@ -3,6 +3,7 @@
     <TargetFramework>net8.0-windows8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NeutralLanguage>en-US</NeutralLanguage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,5 +19,12 @@
     <EmbeddedResource Include="Settings\AlignSettingsControl.xaml">
       <LogicalName>Proxima.Align.AlignSettingsControl.xaml</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\icon.png" />
+    <Content Include="Assets\preview.png" />
+    <Content Include="..\..\LICENSE.txt" Link="LICENSE.txt" />
+    <Content Include="..\..\RELEASE-NOTES.txt" Link="RELEASE-NOTES.txt" />
   </ItemGroup>
 </Project>

@@ -7,4 +7,7 @@
   <Folder Name="/src/">
     <Project Path="src/Proxima.Align/Proxima.Align.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Proxima.Align.Tests/Proxima.Align.Tests.csproj" />
+  </Folder>
 </Solution>

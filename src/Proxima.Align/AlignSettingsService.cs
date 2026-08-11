@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Proxima.Align;
@@ -16,7 +17,7 @@ internal sealed class AlignSettingsService
     /// <summary>
     /// The full path to the settings file in the user's application data directory.
     /// </summary>
-    private static readonly string SettingsFilePath = Path.Combine(
+    private static readonly string DefaultSettingsFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Proxima.Align",
         SettingsFileName);
@@ -29,7 +30,21 @@ internal sealed class AlignSettingsService
     /// <summary>
     /// The currently loaded settings instance.
     /// </summary>
-    private AlignSettings _current = Load();
+    private readonly string _settingsFilePath;
+    private AlignSettings _current;
+
+    public AlignSettingsService()
+        : this(DefaultSettingsFilePath)
+    {
+    }
+
+    internal AlignSettingsService(string settingsFilePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsFilePath);
+
+        _settingsFilePath = settingsFilePath;
+        _current = Load();
+    }
 
     /// <summary>
     /// Gets the current application settings.
@@ -41,33 +56,46 @@ internal sealed class AlignSettingsService
     /// If the file does not exist or cannot be read, returns a new default settings instance.
     /// </summary>
     /// <returns>The loaded <see cref="AlignSettings"/> or a new instance if loading fails.</returns>
-    private static AlignSettings Load()
+    private AlignSettings Load()
     {
         try
         {
-            if (File.Exists(SettingsFilePath))
+            if (File.Exists(_settingsFilePath))
             {
-                var json = File.ReadAllText(SettingsFilePath);
+                var json = File.ReadAllText(_settingsFilePath);
                 return JsonSerializer.Deserialize<AlignSettings>(json) ?? new AlignSettings();
             }
         }
-        catch { }
+        catch (IOException ex)
+        {
+            Debug.WriteLine($"[Proxima.Align] Unable to read settings: {ex}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Debug.WriteLine($"[Proxima.Align] Unable to access settings: {ex}");
+        }
+        catch (JsonException ex)
+        {
+            Debug.WriteLine($"[Proxima.Align] Invalid settings JSON: {ex}");
+        }
+
         return new AlignSettings();
     }
 
     /// <summary>
     /// Saves the specified settings to the settings file and updates the current settings.
-    /// Creates the settings directory if it does not exist. Silently fails if the save operation fails.
+    /// Creates the settings directory if it does not exist.
     /// </summary>
     /// <param name="settings">The settings to save.</param>
     public void Save(AlignSettings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var settingsDirectory = Path.GetDirectoryName(_settingsFilePath);
+        if (!string.IsNullOrEmpty(settingsDirectory))
+            Directory.CreateDirectory(settingsDirectory);
+
+        File.WriteAllText(_settingsFilePath, JsonSerializer.Serialize(settings, JsonOptions));
         _current = settings;
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(SettingsFilePath)!);
-            File.WriteAllText(SettingsFilePath, JsonSerializer.Serialize(settings, JsonOptions));
-        }
-        catch { }
     }
 }

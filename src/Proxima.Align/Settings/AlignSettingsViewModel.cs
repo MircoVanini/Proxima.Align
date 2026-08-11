@@ -1,9 +1,7 @@
-using Microsoft.VisualStudio.Extensibility.ToolWindows;
 using Microsoft.VisualStudio.Extensibility.UI;
-using Microsoft.VisualStudio.RpcContracts.RemoteUI;
-using Microsoft.Win32;
 using System.Runtime.Serialization;
-using System.Text;
+using System.Security;
+using System.Text.Json;
 
 namespace Proxima.Align;
 
@@ -53,20 +51,13 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
 
     private bool _spaceBefore;
     private bool _spaceAfter;
+    private string _saveStatusMessage = string.Empty;
+    private bool _hasSaveStatus;
 
     [DataMember] public bool SpaceBefore { get => _spaceBefore; set => SetProperty(ref _spaceBefore, value); }
     [DataMember] public bool SpaceAfter { get => _spaceAfter; set => SetProperty(ref _spaceAfter, value); }
-
-    [DataMember] public bool IsDarkTheme { get; }
-    [DataMember] public string ColorForeground { get; }
-    [DataMember] public string ColorBackground { get; }
-    [DataMember] public string ColorGroupBg { get; }
-    [DataMember] public string ColorGroupBorder { get; }
-    [DataMember] public string ColorBoxBorder { get; }   // CheckBox border
-    [DataMember] public string ColorBoxCheck { get; }   // CheckBox glyph
-    [DataMember] public string ColorBoxBg { get; }   // CheckBox inner bg
-    [DataMember] public string ColorBtnBg { get; }
-    [DataMember] public string ColorBtnBorder { get; }
+    [DataMember] public string SaveStatusMessage { get => _saveStatusMessage; private set => SetProperty(ref _saveStatusMessage, value); }
+    [DataMember] public bool HasSaveStatus { get => _hasSaveStatus; private set => SetProperty(ref _hasSaveStatus, value); }
 
     [DataMember] public AsyncCommand SaveCommand { get; }
     [DataMember] public AsyncCommand RestoreCommand { get; }
@@ -79,33 +70,6 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     {
         _service = service;
         LoadFromSettings(_service.Current);
-
-        IsDarkTheme = false;
-
-        if (IsDarkTheme)
-        {
-            ColorForeground  = "#FFD4D4D4";
-            ColorBackground  = "#FF1E1E1E";
-            ColorGroupBg     = "#FF252526";
-            ColorGroupBorder = "#FF3F3F46";
-            ColorBoxBorder   = "#FF999999";
-            ColorBoxCheck    = "#FFD4D4D4";
-            ColorBoxBg       = "#FF3C3C3C";
-            ColorBtnBg       = "#FF3F3F46";
-            ColorBtnBorder   = "#FF555558";
-        }
-        else
-        {
-            ColorForeground  = "#FF1E1E1E";
-            ColorBackground  = "#FFF5F5F5";
-            ColorGroupBg     = "#FFFFFFFF";
-            ColorGroupBorder = "#FFCCCCCC";
-            ColorBoxBorder   = "#FF717171";
-            ColorBoxCheck    = "#FF1E1E1E";
-            ColorBoxBg       = "#FFFFFFFF";
-            ColorBtnBg       = "#FFE1E1E1";
-            ColorBtnBorder   = "#FFACACAC";
-        }
 
         SaveCommand = new AsyncCommand(ExecuteSaveAsync);
         RestoreCommand = new AsyncCommand(ExecuteRestoreAsync);
@@ -154,12 +118,7 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
         if (OpShrEq) ops.Add(">>=");
         if (OpArrow) ops.Add("=>");
 
-        return new AlignSettings
-        {
-            EnabledOperators = ops,
-            SpaceBeforeOperator = SpaceBefore,
-            SpaceAfterOperator = SpaceAfter,
-        };
+        return _service.Current.WithAlignmentPreferences(ops, SpaceBefore, SpaceAfter);
     }
 
     /// <summary>
@@ -170,7 +129,32 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     /// <returns>A completed task.</returns>
     private Task ExecuteSaveAsync(object? parameter, CancellationToken ct)
     {
-        _service.Save(ToSettings());
+        try
+        {
+            _service.Save(ToSettings());
+            SetSaveStatus("Settings saved.");
+        }
+        catch (IOException ex)
+        {
+            SetSaveStatus($"Unable to save settings: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            SetSaveStatus($"Unable to save settings: {ex.Message}");
+        }
+        catch (JsonException ex)
+        {
+            SetSaveStatus($"Unable to serialize settings: {ex.Message}");
+        }
+        catch (NotSupportedException ex)
+        {
+            SetSaveStatus($"Unable to save settings: {ex.Message}");
+        }
+        catch (SecurityException ex)
+        {
+            SetSaveStatus($"Unable to save settings: {ex.Message}");
+        }
+
         return Task.CompletedTask;
     }
 
@@ -183,6 +167,14 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     private Task ExecuteRestoreAsync(object? parameter, CancellationToken ct)
     {
         LoadFromSettings(new AlignSettings());
+        SaveStatusMessage = string.Empty;
+        HasSaveStatus = false;
         return Task.CompletedTask;
-    }    
+    }
+
+    private void SetSaveStatus(string message)
+    {
+        SaveStatusMessage = message;
+        HasSaveStatus = true;
+    }
 }

@@ -57,4 +57,20 @@ internal sealed class AlignSettings
     /// The number of spaces per tab. Default is 4.
     /// </value>
     public int  TabSize { get; set; } = 4;
+
+    public AlignSettings WithAlignmentPreferences(
+        List<string> enabledOperators,
+        bool spaceBeforeOperator,
+        bool spaceAfterOperator)
+    {
+        return new AlignSettings
+        {
+            EnabledOperators = enabledOperators,
+            AutoAlign = AutoAlign,
+            AlignComments = AlignComments,
+            SpaceBeforeOperator = spaceBeforeOperator,
+            SpaceAfterOperator = spaceAfterOperator,
+            TabSize = TabSize,
+        };
+    }
 }

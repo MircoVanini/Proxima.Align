@@ -134,7 +134,8 @@ internal class AlignAssignmentsCommand : Command
             var settings = _settingsService.Current;
             settings.TabSize = tabSize;
 
-            var aligned   = AlignmentService.AlignOperators(lines, settings);
+            var precedingText = fullText[..startIdx];
+            var aligned = AlignmentService.AlignOperators(lines, settings, precedingText);
 
             if (aligned is null)
             {

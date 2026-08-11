@@ -30,7 +30,16 @@ internal class ExtensionEntrypoint : Extension
                 version: this.ExtensionAssemblyVersion,
                 publisherName: "Proxima Software",
                 displayName: "Proxima Align Assignments",
-                description: "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks."),
+                description: "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks.")
+        {
+            Preview = false,
+            MoreInfo = "https://github.com/MircoVanini/Proxima.Align",
+            License = "LICENSE.txt",
+            ReleaseNotes = "RELEASE-NOTES.txt",
+            Icon = "Assets/icon.png",
+            PreviewImage = "Assets/preview.png",
+            Tags = ["alignment", "assignments", "formatting", "productivity"],
+        },
     };
 
     /// <summary>

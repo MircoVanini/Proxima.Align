@@ -1,0 +1,43 @@
+name: Build VSIX
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore .\Proxima.Align.slnx
+
+      - name: Test
+        run: dotnet test .\Proxima.Align.slnx -c Release --no-restore --nologo
+
+      - name: Build VSIX
+        run: dotnet build .\Proxima.Align.slnx -c Release --no-restore --nologo
+
+      - name: Verify VSIX package
+        shell: pwsh
+        run: .\scripts\Verify-Vsix.ps1
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Proxima.Align-${{ github.ref_name }}
+          path: src\Proxima.Align\bin\Release\net8.0-windows8.0\Proxima.Align.vsix
+          if-no-files-found: error

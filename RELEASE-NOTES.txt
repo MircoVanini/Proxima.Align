@@ -1,0 +1,13 @@
+Proxima Align Assignments 1.0.0
+
+Initial stable release.
+
+- Aligns assignment, compound assignment, shift assignment, and lambda operators.
+- Preserves indentation and calculates visual columns correctly when tabs are used.
+- Ignores operators inside strings, character literals, and comments.
+- Supports selections that begin inside multiline strings or comments.
+- Provides configurable operators and spacing.
+- Uses native Visual Studio theming in the settings interface.
+- Persists settings with explicit inline error reporting.
+
+Requires Visual Studio 17.14 or later on Windows.

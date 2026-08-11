@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace Proxima.Align;
 
 /// <summary>
@@ -20,50 +18,44 @@ internal static class AlignmentService
     ];
 
     /// <summary>
-    /// Regular expression for matching line comments (// style) to the end of a line.
-    /// </summary>
-    private static readonly Regex LineCommentRegex = new(@"//.*$", RegexOptions.Compiled);
-
-    /// <summary>
-    /// Builds a regular expression to match operators on a line.
-    /// Regex with 4 groups:
-    ///   (1) left part  (2) spaces before the operator
-    ///   (3) operator   (4) remainder after the operator
-    /// </summary>
-    /// <param name="enabledOperators">The collection of operators that should be matched.</param>
-    /// <returns>A compiled regular expression that matches the enabled operators, or a never-matching regex if no operators are enabled.</returns>
-    private static Regex BuildOperatorRegex(IEnumerable<string> enabledOperators)
-    {
-        var ordered = AllOperators.Where(enabledOperators.Contains).ToList();
-        if (ordered.Count == 0)
-            return new Regex("(?!)", RegexOptions.Compiled);
-
-        var parts = ordered.Select(op =>
-            op == "=" ? @"(?<![=!<>+\-*/%&|^])=(?!=)" : Regex.Escape(op));
-
-        var pattern = $@"^(.*?)(\s*)({string.Join("|", parts)})(\s*.*)$";
-        return new Regex(pattern, RegexOptions.Compiled);
-    }
-
-    /// <summary>
     /// Aligns operators across multiple lines of code by adding appropriate spacing.
     /// </summary>
     /// <param name="lines">The lines of code to align.</param>
     /// <param name="settings">Settings that control alignment behavior, including which operators to align and spacing preferences.</param>
+    /// <param name="precedingText">Document text preceding the first line, used to establish multiline lexical state.</param>
     /// <returns>
     /// An array of aligned lines if alignment is possible (at least 2 lines with operators found),
     /// or <c>null</c> if alignment cannot be performed (empty input or fewer than 2 lines with operators).
     /// </returns>
-    public static string[]? AlignOperators(string[] lines, AlignSettings settings)
+    public static string[]? AlignOperators(
+        string[] lines,
+        AlignSettings settings,
+        string? precedingText = null)
     {
         if (lines.Length == 0)
             return null;
 
-        var operatorRegex = BuildOperatorRegex(settings.EnabledOperators);
-        int tabSize       = settings.TabSize > 0 ? settings.TabSize : 4;
+        var enabledOperators = AllOperators
+            .Where(settings.EnabledOperators.Contains)
+            .ToArray();
+        int tabSize = settings.TabSize > 0 ? settings.TabSize : 4;
+        var lexerState = new LexerState();
+
+        if (!string.IsNullOrEmpty(precedingText))
+        {
+            foreach (var precedingLine in precedingText.Split('\n'))
+            {
+                ParseLine(
+                    precedingLine.TrimEnd('\r'),
+                    [],
+                    alignComments: false,
+                    tabSize,
+                    lexerState);
+            }
+        }
 
         var parsed = lines
-            .Select(line => ParseLine(line, operatorRegex, settings.AlignComments, tabSize))
+            .Select(line => ParseLine(line, enabledOperators, settings.AlignComments, tabSize, lexerState))
             .ToArray();
 
         var withOperator = parsed.Where(p => p.Operator is not null).ToList();
@@ -135,45 +127,245 @@ internal static class AlignmentService
     /// Handles line comments by optionally excluding them from operator matching.
     /// </summary>
     /// <param name="line">The line of code to parse.</param>
-    /// <param name="operatorRegex">The regular expression to use for matching operators.</param>
+    /// <param name="enabledOperators">The enabled operators, ordered from longest to shortest.</param>
     /// <param name="alignComments">If <c>false</c>, operators within line comments are ignored.</param>
     /// <param name="tabSize">The tab size for calculating visual width.</param>
+    /// <param name="lexerState">Lexical state carried across lines for multiline comments and strings.</param>
     /// <returns>A <see cref="ParsedLine"/> record containing the parsed components and metadata.</returns>
-    private static ParsedLine ParseLine(string line, Regex operatorRegex, bool alignComments, int tabSize)
+    private static ParsedLine ParseLine(
+        string line,
+        string[] enabledOperators,
+        bool alignComments,
+        int tabSize,
+        LexerState lexerState)
     {
-        string matchTarget = line;
-        string? trailingComment = null;
+        int operatorIndex = -1;
+        string? matchedOperator = null;
+        bool inLineComment = false;
 
-        if (!alignComments)
+        for (int i = 0; i < line.Length;)
         {
-            var commentMatch = LineCommentRegex.Match(line);
-            if (commentMatch.Success)
+            if (lexerState.RawStringQuoteCount > 0)
             {
-                matchTarget = line[..commentMatch.Index];
-                trailingComment = line[commentMatch.Index..];
+                int quoteCount = CountRun(line, i, '"');
+                if (quoteCount >= lexerState.RawStringQuoteCount)
+                {
+                    lexerState.RawStringQuoteCount = 0;
+                    i += quoteCount;
+                }
+                else
+                {
+                    i += Math.Max(1, quoteCount);
+                }
+                continue;
             }
+
+            if (lexerState.InVerbatimString)
+            {
+                if (line[i] == '"' && i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    i += 2;
+                }
+                else if (line[i] == '"')
+                {
+                    lexerState.InVerbatimString = false;
+                    i++;
+                }
+                else
+                {
+                    i++;
+                }
+                continue;
+            }
+
+            if (lexerState.InBlockComment)
+            {
+                if (i + 1 < line.Length && line[i] == '*' && line[i + 1] == '/')
+                {
+                    lexerState.InBlockComment = false;
+                    i += 2;
+                    continue;
+                }
+
+                if (alignComments && matchedOperator is null &&
+                    TryMatchOperator(line, i, enabledOperators, out var commentOperator))
+                {
+                    operatorIndex = i;
+                    matchedOperator = commentOperator;
+                    i += commentOperator.Length;
+                    continue;
+                }
+
+                i++;
+                continue;
+            }
+
+            if (inLineComment)
+            {
+                if (alignComments && matchedOperator is null &&
+                    TryMatchOperator(line, i, enabledOperators, out var commentOperator))
+                {
+                    operatorIndex = i;
+                    matchedOperator = commentOperator;
+                    i += commentOperator.Length;
+                }
+                else
+                {
+                    i++;
+                }
+                continue;
+            }
+
+            if (i + 1 < line.Length && line[i] == '/' && line[i + 1] == '/')
+            {
+                inLineComment = true;
+                i += 2;
+                continue;
+            }
+
+            if (i + 1 < line.Length && line[i] == '/' && line[i + 1] == '*')
+            {
+                lexerState.InBlockComment = true;
+                i += 2;
+                continue;
+            }
+
+            if (line[i] == '"')
+            {
+                int quoteCount = CountRun(line, i, '"');
+                if (quoteCount >= 3)
+                {
+                    lexerState.RawStringQuoteCount = quoteCount;
+                    i += quoteCount;
+                }
+                else
+                {
+                    bool isVerbatim = i > 0 && line[i - 1] == '@';
+                    i = SkipQuotedLiteral(line, i + 1, '"', isVerbatim, out bool terminated);
+                    lexerState.InVerbatimString = isVerbatim && !terminated;
+                }
+                continue;
+            }
+
+            if (line[i] == '\'')
+            {
+                i = SkipQuotedLiteral(line, i + 1, '\'', false, out _);
+                continue;
+            }
+
+            if (matchedOperator is null &&
+                TryMatchOperator(line, i, enabledOperators, out var codeOperator))
+            {
+                operatorIndex = i;
+                matchedOperator = codeOperator;
+                i += codeOperator.Length;
+                continue;
+            }
+
+            i++;
         }
 
-        var match = operatorRegex.Match(matchTarget);
-        if (!match.Success)
+        if (matchedOperator is null)
             return new ParsedLine(line, null, 0, 0, null, 0, null);
 
-        var leftRaw     = match.Groups[1].Value;   // include trailing spaces
-        var spacesBefore = match.Groups[2].Value.Length;
-        var leftVisual  = VisualWidth(leftRaw.TrimEnd(), tabSize);
+        var leftRaw = line[..operatorIndex];
+        var spacesBefore = leftRaw.Length - leftRaw.TrimEnd().Length;
+        var leftVisual = VisualWidth(leftRaw.TrimEnd(), tabSize);
 
-        var rawRight    = match.Groups[4].Value;
+        var rawRight = line[(operatorIndex + matchedOperator.Length)..];
         var spacesAfter = rawRight.Length - rawRight.TrimStart().Length;
-        var rightValue  = rawRight.TrimStart() + (trailingComment ?? "");
+        var rightValue = rawRight.TrimStart();
 
         return new ParsedLine(
             Original:        line,
             Left:            leftRaw,
             SpacesBefore:    spacesBefore,
             LeftVisualWidth: leftVisual,
-            Operator:        match.Groups[3].Value,
+            Operator:        matchedOperator,
             SpacesAfter:     spacesAfter,
             Right:           rightValue);
+    }
+
+    private static bool TryMatchOperator(
+        string line,
+        int index,
+        string[] enabledOperators,
+        out string matchedOperator)
+    {
+        foreach (var candidate in enabledOperators)
+        {
+            if (index + candidate.Length > line.Length ||
+                !line.AsSpan(index, candidate.Length).SequenceEqual(candidate))
+            {
+                continue;
+            }
+
+            if (candidate == "=" &&
+                ((index > 0 && IsAdjacentOperatorCharacter(line[index - 1])) ||
+                 (index + 1 < line.Length && line[index + 1] is '=' or '>')))
+            {
+                continue;
+            }
+
+            matchedOperator = candidate;
+            return true;
+        }
+
+        matchedOperator = string.Empty;
+        return false;
+    }
+
+    private static bool IsAdjacentOperatorCharacter(char value)
+        => value is '=' or '!' or '<' or '>' or '+' or '-' or '*' or '/' or '%' or '&' or '|' or '^';
+
+    private static int CountRun(string text, int start, char value)
+    {
+        int end = start;
+        while (end < text.Length && text[end] == value)
+            end++;
+        return end - start;
+    }
+
+    private static int SkipQuotedLiteral(
+        string line,
+        int index,
+        char delimiter,
+        bool verbatim,
+        out bool terminated)
+    {
+        while (index < line.Length)
+        {
+            if (verbatim && line[index] == delimiter &&
+                index + 1 < line.Length && line[index + 1] == delimiter)
+            {
+                index += 2;
+                continue;
+            }
+
+            if (!verbatim && line[index] == '\\')
+            {
+                index += Math.Min(2, line.Length - index);
+                continue;
+            }
+
+            if (line[index] == delimiter)
+            {
+                terminated = true;
+                return index + 1;
+            }
+
+            index++;
+        }
+
+        terminated = false;
+        return index;
+    }
+
+    private sealed class LexerState
+    {
+        public bool InBlockComment { get; set; }
+        public bool InVerbatimString { get; set; }
+        public int RawStringQuoteCount { get; set; }
     }
 
     /// <summary>
