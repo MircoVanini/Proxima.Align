@@ -5,46 +5,30 @@ namespace Proxima.Align;
 
 /// <summary>
 /// Extension entrypoint for the Proxima Align Assignments Visual Studio extension.
-/// This class serves as the main entry point for the VisualStudio.Extensibility extension framework,
-/// configuring the extension's metadata and initializing required services.
 /// </summary>
 /// <remarks>
-/// This extension provides functionality to align assignment operators (=, +=, -= , *=, /=, =>) 
-/// in selected code blocks, improving code readability and consistency. The extension integrates
-/// with Visual Studio through the VisualStudio.Extensibility framework.
+/// This extension aligns assignment operators
+/// (=, +=, -=, *=, /=, %=, &amp;=, |=, ^=, &lt;&lt;=, &gt;&gt;=, =&gt;)
+/// in selected code blocks, improving readability and formatting consistency.
 /// </remarks>
 [VisualStudioContribution]
 internal class ExtensionEntrypoint : Extension
 {
-    /// <summary>
-    /// Gets the configuration settings for the Proxima Align Assignments extension.
-    /// </summary>
-    /// <value>
-    /// An <see cref="ExtensionConfiguration"/> instance containing the extension's metadata
-    /// including its unique identifier, version, publisher information, and description.
-    /// </value>
+    /// <inheritdoc/>
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
         Metadata = new(
-                id: "Proxima.Align.02d9493a-1406-4d2a-aa3b-2d686783003e",
-                version: this.ExtensionAssemblyVersion,
-                publisherName: "Proxima Software",
-                displayName: "Proxima Align Assignments",
-                description: "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks."),
+            id:            "Proxima.Align.02d9493a-1406-4d2a-aa3b-2d686783003e",
+            version:       this.ExtensionAssemblyVersion,
+            publisherName: "Proxima Software",
+            displayName:   "Proxima Align Assignments",
+            description:   "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks."),
     };
 
-    /// <summary>
-    /// Initializes the dependency injection services required by the extension.
-    /// </summary>
-    /// <param name="serviceCollection">The service collection to register services with.</param>
-    /// <remarks>
-    /// This method registers the <see cref="AlignSettingsService"/> as a singleton service,
-    /// which manages the configuration and settings for the alignment functionality.
-    /// </remarks>
+    /// <inheritdoc/>
     protected override void InitializeServices(IServiceCollection serviceCollection)
     {
         base.InitializeServices(serviceCollection);
-
         serviceCollection.AddSingleton<AlignSettingsService>();
     }
 }

@@ -1,7 +1,9 @@
-using System.Diagnostics;
 using Microsoft.VisualStudio.Extensibility;
 using Microsoft.VisualStudio.Extensibility.Commands;
 using Microsoft.VisualStudio.Extensibility.Editor;
+using StreamJsonRpc;
+using System.Diagnostics;
+// ✅ rimosso: using Microsoft.VisualStudio.Settings; (non utilizzo
 
 namespace Proxima.Align;
 
@@ -20,9 +22,10 @@ internal class AlignAssignmentsCommand : Command
     private static readonly CommandConfiguration _commandConfiguration =
         new("%Proxima.Align.AlignAssignmentsCommand.DisplayName%")
         {
-            Placements = [],
-            Icon      = new(ImageMoniker.KnownValues.AlignLeft, IconSettings.IconAndText),
-            Shortcuts = [new CommandShortcutConfiguration(ModifierKey.ControlLeftAlt, Key.VK_OEM_5)],
+            Placements  = [],
+            Icon        = new(ImageMoniker.KnownValues.AlignLeft, IconSettings.IconAndText),
+            Shortcuts   = [new CommandShortcutConfiguration(ModifierKey.ControlLeftAlt, Key.VK_OEM_5)],
+            EnabledWhen = ActivationConstraint.EditorContentType("code"),
         };
 
     public override CommandConfiguration CommandConfiguration => _commandConfiguration;
@@ -32,7 +35,7 @@ internal class AlignAssignmentsCommand : Command
     /// <summary>
     /// Initializes a new instance of the <see cref="AlignAssignmentsCommand"/> class.
     /// </summary>
-    /// <param name="settingsService">The service providing alignment settings such as tab size and operator preferences.</param>
+    /// <param name="settingsService">The service providing alignment settings.</param>
     public AlignAssignmentsCommand(AlignSettingsService settingsService)
     {
         _settingsService = settingsService;
@@ -43,25 +46,22 @@ internal class AlignAssignmentsCommand : Command
     /// </summary>
     /// <param name="context">The client context providing access to the Visual Studio editor.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    /// <remarks>
-    /// The command performs the following steps:
-    /// <list type="number">
-    /// <item>Retrieves the active text view and validates that a selection exists</item>
-    /// <item>Expands the selection to include complete lines</item>
-    /// <item>Detects the document's line ending format (CRLF or LF)</item>
-    /// <item>Retrieves the tab size from the document settings</item>
-    /// <item>Applies operator alignment using the <see cref="AlignmentService"/></item>
-    /// <item>Replaces the selected text with the aligned version if changes were made</item>
-    /// </list>
-    /// If the selection is empty, contains no alignable operators, or an error occurs, 
-    /// no changes are made to the document.
-    /// </remarks>
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
         try
         {
-            var textView = await context.GetActiveTextViewAsync(cancellationToken);
+            ITextViewSnapshot? textView;
+            try
+            {
+                textView = await context.GetActiveTextViewAsync(cancellationToken);
+            }
+            catch (RemoteInvocationException ex) when (ex.Message.Contains("document is not open"))
+            {
+                // Race condition: documento chiuso prima che la sottoscrizione asincrona completasse.
+                LogMessage("[Proxima.Align] Skipped: document closed before subscription (transient).");
+                return;
+            }
+
             if (textView is null) return;
 
             var selection = textView.Selection;
@@ -71,26 +71,20 @@ internal class AlignAssignmentsCommand : Command
             var fullText  = document.Text.CopyToString();
             var selExtent = selection.Extent;
 
-            // Base offset of the document (can be non-zero in VS)
-            int docBase = document.Text.Start.Offset;
-
-            // Indices in the fullText buffer (0-based relative to fullText[0])
+            int docBase  = document.Text.Start.Offset;
             int selStart = selExtent.Start.Offset - docBase;
             int selEnd   = selExtent.End.Offset   - docBase;
 
             if (selStart < 0 || selEnd > fullText.Length || selStart >= selEnd) return;
 
-            // Detect the type of line ending used in the document
             var lineEnding = fullText.Contains("\r\n") ? "\r\n" : "\n";
 
-            // Search backwards for the start of the line containing selStart
+            // Espande la selezione all'intera prima riga
             int startIdx = selStart;
             while (startIdx > 0 && fullText[startIdx - 1] != '\n')
                 startIdx--;
 
-            // If selEnd falls exactly at the start of a new line (cursor in col 0)
-            // or on a line break character, go back to the last character
-            // of content in the last selected line.
+            // Ritira selEnd fino all'ultimo carattere di contenuto dell'ultima riga selezionata
             int endAdj = selEnd;
             while (endAdj > startIdx)
             {
@@ -98,30 +92,31 @@ internal class AlignAssignmentsCommand : Command
                 char prev = endAdj > 0               ? fullText[endAdj - 1] : '\0';
 
                 if (cur == '\r' || cur == '\n')
-                    endAdj--;          // we're on a line break → go back
+                    endAdj--;
                 else if (prev == '\n' || prev == '\r')
-                    endAdj--;          // we're at the start of a line → go back
+                    endAdj--;
                 else
                     break;
             }
 
-            // Search forward for the end of the line containing endAdj (excluding the line break)
+            // Avanza fino alla fine della riga contenente endAdj
             int endIdx = endAdj;
             while (endIdx < fullText.Length && fullText[endIdx] != '\r' && fullText[endIdx] != '\n')
                 endIdx++;
 
             if (endIdx <= startIdx) return;
 
-            // Extract clean lines (without residual \r from CRLF)
-            var blockText = fullText.Substring(startIdx, endIdx - startIdx);
-            var lines     = blockText.Split('\n').Select(l => l.TrimEnd('\r')).ToArray();
+            var lines = fullText
+                .Substring(startIdx, endIdx - startIdx)
+                .Split('\n')
+                .Select(l => l.TrimEnd('\r'))
+                .ToArray();
 
-            Debug.WriteLine($"[Proxima.Align] docBase={docBase} selStart={selStart} selEnd={selEnd}");
-            Debug.WriteLine($"[Proxima.Align] startIdx={startIdx} endIdx={endIdx} lines={lines.Length}");
+            LogMessage($"[Proxima.Align] docBase={docBase} selStart={selStart} selEnd={selEnd}");
+            LogMessage($"[Proxima.Align] startIdx={startIdx} endIdx={endIdx} lines={lines.Length}");
             for (int i = 0; i < lines.Length; i++)
-                Debug.WriteLine($"[Proxima.Align]   line[{i}]: '{lines[i]}'");
+                LogMessage($"[Proxima.Align]   line[{i}]: '{lines[i]}'");
 
-            // Read the tab size from the document (default 4)
             int tabSize = 4;
             try
             {
@@ -131,37 +126,60 @@ internal class AlignAssignmentsCommand : Command
             }
             catch { /* use the default */ }
 
-            var settings = _settingsService.Current;
-            settings.TabSize = tabSize;
-
-            var aligned   = AlignmentService.AlignOperators(lines, settings);
+            var settings = _settingsService.Current.WithTabSize(tabSize);
+            var aligned  = AlignmentService.AlignOperators(lines, settings);
 
             if (aligned is null)
             {
-                Debug.WriteLine($"[Proxima.Align] AlignOperators returned null (< 2 lines with operators?)");
+                LogMessage("[Proxima.Align] AlignOperators returned null (< 2 lines with operators?)");
                 return;
             }
 
-            Debug.WriteLine($"[Proxima.Align] aligned:");
+            LogMessage("[Proxima.Align] aligned:");
             for (int i = 0; i < aligned.Length; i++)
-                Debug.WriteLine($"[Proxima.Align]   aligned[{i}]: '{aligned[i]}'");
+                LogMessage($"[Proxima.Align]   aligned[{i}]: '{aligned[i]}'");
 
             var newText      = string.Join(lineEnding, aligned);
             var originalText = string.Join(lineEnding, lines);
             if (newText == originalText) return;
 
-            // Construct the TextRange using absolute positions (docBase + index)
-            var rangeStart = document.Text.Start + startIdx;
-            var rangeEnd   = document.Text.Start + endIdx;
-            var blockRange = new TextRange(rangeStart, rangeEnd);
+            var blockRange = new TextRange(document.Text.Start + startIdx, document.Text.Start + endIdx);
 
             await this.Extensibility.Editor().EditAsync(
                 editBatch => textView.Document.AsEditable(editBatch).Replace(blockRange, newText),
                 cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // Cancellazione attesa, nessuna azione
+        }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Proxima.Align] Error: {ex}");
+            LogMessage($"[Proxima.Align] Error: {ex}");
         }
+    }
+
+    /// <summary>
+    /// Logs a diagnostic message to the debug output and, if logging is enabled,
+    /// appends it asynchronously (fire-and-forget) to the daily log file.
+    /// </summary>
+    private void LogMessage(string message)
+    {
+        Debug.WriteLine(message);
+
+        if (!_settingsService.Current.EnableLog) return;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var logDir   = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Proxima.Align");
+                Directory.CreateDirectory(logDir);
+                var logFile  = Path.Combine(logDir, $"log_{DateTime.Now:yyyy-MM-dd}.txt");
+                var logEntry = $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}";
+                File.AppendAllText(logFile, logEntry);
+            }
+            catch { /* silent */ }
+        });
     }
 }
