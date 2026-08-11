@@ -101,7 +101,7 @@
                     <CheckBox Content="=>"         IsChecked="{Binding OpArrow}"   Margin="4"/>
                 </WrapPanel>
             </GroupBox>
-
+            
             <GroupBox Header="Spacing around operator" Margin="0,0,0,12" Padding="8">
                 <StackPanel>
                     <CheckBox Content="Space before operator"
@@ -109,6 +109,12 @@
                     <CheckBox Content="Space after operator"
                               IsChecked="{Binding SpaceAfter}"  Margin="0,4"/>
                 </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Logging" Margin="0,0,0,12" Padding="8">
+                <WrapPanel>
+                    <CheckBox Content="Enable logging to (%appdata%\Proxima.Align)" IsChecked="{Binding EnableLog}"   Margin="4"/>
+                </WrapPanel>
             </GroupBox>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

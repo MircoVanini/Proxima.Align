@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace Proxima.Align;
@@ -25,22 +26,40 @@ internal static class AlignmentService
     private static readonly Regex LineCommentRegex = new(@"//.*$", RegexOptions.Compiled);
 
     /// <summary>
-    /// Builds a regular expression to match operators on a line.
-    /// Regex with 4 groups:
-    ///   (1) left part  (2) spaces before the operator
-    ///   (3) operator   (4) remainder after the operator
+    /// Never-matching regex used as a sentinel when no operators are enabled.
     /// </summary>
-    /// <param name="enabledOperators">The collection of operators that should be matched.</param>
-    /// <returns>A compiled regular expression that matches the enabled operators, or a never-matching regex if no operators are enabled.</returns>
+    private static readonly Regex NeverMatchRegex = new("(?!)", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Cache of compiled operator regexes keyed by their canonical operator-set string.
+    /// Avoids the cost of recompiling the same regex on every command execution.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, Regex> RegexCache = new();
+
+    /// <summary>
+    /// Builds (or retrieves from cache) a compiled regex to match operators on a line.
+    /// </summary>
     private static Regex BuildOperatorRegex(IEnumerable<string> enabledOperators)
     {
         var ordered = AllOperators.Where(enabledOperators.Contains).ToList();
         if (ordered.Count == 0)
-            return new Regex("(?!)", RegexOptions.Compiled);
+            return NeverMatchRegex;
 
-        var parts = ordered.Select(op =>
+        var cacheKey = string.Join("|", ordered);
+
+        // ✅ La factory riceve il cacheKey come parametro e non cattura variabili esterne
+        return RegexCache.GetOrAdd(cacheKey, key => CompileRegex(key));
+    }
+
+    /// <summary>
+    /// Compiles a new operator regex from a canonical key (operators joined by '|').
+    /// Called only on cache miss.
+    /// </summary>
+    private static Regex CompileRegex(string cacheKey)
+    {
+        var ordered = cacheKey.Split('|');
+        var parts   = ordered.Select(op =>
             op == "=" ? @"(?<![=!<>+\-*/%&|^])=(?!=)" : Regex.Escape(op));
-
         var pattern = $@"^(.*?)(\s*)({string.Join("|", parts)})(\s*.*)$";
         return new Regex(pattern, RegexOptions.Compiled);
     }
@@ -49,10 +68,10 @@ internal static class AlignmentService
     /// Aligns operators across multiple lines of code by adding appropriate spacing.
     /// </summary>
     /// <param name="lines">The lines of code to align.</param>
-    /// <param name="settings">Settings that control alignment behavior, including which operators to align and spacing preferences.</param>
+    /// <param name="settings">Settings that control alignment behavior.</param>
     /// <returns>
     /// An array of aligned lines if alignment is possible (at least 2 lines with operators found),
-    /// or <c>null</c> if alignment cannot be performed (empty input or fewer than 2 lines with operators).
+    /// or <c>null</c> if alignment cannot be performed.
     /// </returns>
     public static string[]? AlignOperators(string[] lines, AlignSettings settings)
     {
@@ -72,7 +91,6 @@ internal static class AlignmentService
             return null;
 
         // The target (visual) column is the MAX among all lines that have an operator.
-        // Use visual columns so tabs are expanded correctly.
         int operatorColumn = withOperator.Max(p =>
             p.LeftVisualWidth +
             (settings.SpaceBeforeOperator ? Math.Max(1, p.SpacesBefore) : 0));
@@ -94,13 +112,8 @@ internal static class AlignmentService
                 continue;
             }
 
-            // leftTrimmed = text to the left of the operator without trailing spaces
-            var leftTrimmed = p.Left!.TrimEnd();
-
-            // Recalculate the visual width after trim (initial tabs remain)
-            int leftVisual  = VisualWidth(leftTrimmed, tabSize);
-
-            // Spaces (always space, never tab) needed to reach the target column
+            var leftTrimmed  = p.Left!.TrimEnd();
+            int leftVisual   = VisualWidth(leftTrimmed, tabSize);
             int spacesNeeded = operatorColumn - leftVisual;
             var beforePadding = new string(' ', Math.Max(settings.SpaceBeforeOperator ? 1 : 0, spacesNeeded));
 
@@ -111,7 +124,7 @@ internal static class AlignmentService
     }
 
     /// <summary>
-    /// Calcola la larghezza visiva di una stringa tenendo conto dei tab.
+    /// Calculates the visual width of a string accounting for tab stops.
     /// Each tab character advances to the next tab stop position based on the specified tab size.
     /// </summary>
     /// <param name="text">The text to measure.</param>
@@ -134,14 +147,9 @@ internal static class AlignmentService
     /// Parses a single line of code to extract operator and spacing information.
     /// Handles line comments by optionally excluding them from operator matching.
     /// </summary>
-    /// <param name="line">The line of code to parse.</param>
-    /// <param name="operatorRegex">The regular expression to use for matching operators.</param>
-    /// <param name="alignComments">If <c>false</c>, operators within line comments are ignored.</param>
-    /// <param name="tabSize">The tab size for calculating visual width.</param>
-    /// <returns>A <see cref="ParsedLine"/> record containing the parsed components and metadata.</returns>
     private static ParsedLine ParseLine(string line, Regex operatorRegex, bool alignComments, int tabSize)
     {
-        string matchTarget = line;
+        string matchTarget      = line;
         string? trailingComment = null;
 
         if (!alignComments)
@@ -149,8 +157,8 @@ internal static class AlignmentService
             var commentMatch = LineCommentRegex.Match(line);
             if (commentMatch.Success)
             {
-                matchTarget = line[..commentMatch.Index];
-                trailingComment = line[commentMatch.Index..];
+                matchTarget      = line[..commentMatch.Index];
+                trailingComment  = line[commentMatch.Index..];
             }
         }
 
@@ -158,13 +166,12 @@ internal static class AlignmentService
         if (!match.Success)
             return new ParsedLine(line, null, 0, 0, null, 0, null);
 
-        var leftRaw     = match.Groups[1].Value;   // include trailing spaces
+        var leftRaw      = match.Groups[1].Value;
         var spacesBefore = match.Groups[2].Value.Length;
-        var leftVisual  = VisualWidth(leftRaw.TrimEnd(), tabSize);
-
-        var rawRight    = match.Groups[4].Value;
-        var spacesAfter = rawRight.Length - rawRight.TrimStart().Length;
-        var rightValue  = rawRight.TrimStart() + (trailingComment ?? "");
+        var leftVisual   = VisualWidth(leftRaw.TrimEnd(), tabSize);
+        var rawRight     = match.Groups[4].Value;
+        var spacesAfter  = rawRight.Length - rawRight.TrimStart().Length;
+        var rightValue   = rawRight.TrimStart() + (trailingComment ?? "");
 
         return new ParsedLine(
             Original:        line,
@@ -179,13 +186,6 @@ internal static class AlignmentService
     /// <summary>
     /// Represents a parsed line of code containing information about an operator and surrounding content.
     /// </summary>
-    /// <param name="Original">The original unmodified line.</param>
-    /// <param name="Left">The content to the left of the operator, including any trailing spaces. <c>null</c> if no operator found.</param>
-    /// <param name="SpacesBefore">The number of spaces immediately before the operator.</param>
-    /// <param name="LeftVisualWidth">The visual width of the left content (excluding trailing spaces) accounting for tabs.</param>
-    /// <param name="Operator">The matched operator. <c>null</c> if no operator found.</param>
-    /// <param name="SpacesAfter">The number of spaces immediately after the operator.</param>
-    /// <param name="Right">The content to the right of the operator (after leading spaces are trimmed), including any trailing comment. <c>null</c> if no operator found.</param>
     private record ParsedLine
     (
         string  Original,
