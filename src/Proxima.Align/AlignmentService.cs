@@ -132,12 +132,11 @@ internal static class AlignmentService
     /// <param name="tabSize">The tab size for calculating visual width.</param>
     /// <param name="lexerState">Lexical state carried across lines for multiline comments and strings.</param>
     /// <returns>A <see cref="ParsedLine"/> record containing the parsed components and metadata.</returns>
-    private static ParsedLine ParseLine(
-        string line,
-        string[] enabledOperators,
-        bool alignComments,
-        int tabSize,
-        LexerState lexerState)
+    private static ParsedLine ParseLine(string line,
+                                        string[] enabledOperators,
+                                        bool alignComments,
+                                        int tabSize,
+                                        LexerState lexerState)
     {
         int operatorIndex = -1;
         string? matchedOperator = null;

@@ -57,6 +57,12 @@
                 </StackPanel>
             </GroupBox>
 
+            <GroupBox Header="Logging" Margin="0,0,0,12" Padding="8">
+                <WrapPanel>
+                    <CheckBox Content="Enable logging to (%appdata%\Proxima.Align)" IsChecked="{Binding EnableLog}"   Margin="4"/>
+                </WrapPanel>
+            </GroupBox>
+
             <TextBlock Text="{Binding SaveStatusMessage}" Margin="0,0,0,8">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
