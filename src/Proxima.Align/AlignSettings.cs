@@ -65,11 +65,31 @@ internal sealed class AlignSettings
     {
         return new AlignSettings
         {
-            EnabledOperators = enabledOperators,
+            EnabledOperators = [.. enabledOperators],
             AutoAlign = AutoAlign,
             AlignComments = AlignComments,
             SpaceBeforeOperator = spaceBeforeOperator,
             SpaceAfterOperator = spaceAfterOperator,
+            TabSize = TabSize,
+        };
+    }
+
+    public AlignSettings WithTabSize(int tabSize)
+    {
+        var copy = Copy();
+        copy.TabSize = tabSize;
+        return copy;
+    }
+
+    public AlignSettings Copy()
+    {
+        return new AlignSettings
+        {
+            EnabledOperators = [.. EnabledOperators],
+            AutoAlign = AutoAlign,
+            AlignComments = AlignComments,
+            SpaceBeforeOperator = SpaceBeforeOperator,
+            SpaceAfterOperator = SpaceAfterOperator,
             TabSize = TabSize,
         };
     }

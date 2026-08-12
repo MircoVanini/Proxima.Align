@@ -27,13 +27,37 @@ public sealed class AlignSettingsServiceTests : IDisposable
 
         service.Save(settings);
 
-        Assert.Same(settings, service.Current);
+        Assert.NotSame(settings, service.Current);
         var persisted = JsonSerializer.Deserialize<AlignSettings>(File.ReadAllText(settingsPath));
         Assert.NotNull(persisted);
         Assert.Equal(settings.EnabledOperators, persisted.EnabledOperators);
         Assert.Equal(settings.AutoAlign, persisted.AutoAlign);
         Assert.Equal(settings.AlignComments, persisted.AlignComments);
         Assert.Equal(settings.TabSize, persisted.TabSize);
+    }
+
+    [Fact]
+    public void Current_ReturnsADeepCopyOfStoredSettings()
+    {
+        var settingsPath = Path.Combine(_testDirectory, "settings.json");
+        var service = new AlignSettingsService(settingsPath);
+        var settings = new AlignSettings
+        {
+            EnabledOperators = ["=", "+="],
+            TabSize = 4,
+        };
+
+        service.Save(settings);
+        settings.TabSize = 8;
+        settings.EnabledOperators.Clear();
+
+        var firstRead = service.Current;
+        firstRead.TabSize = 2;
+        firstRead.EnabledOperators.Remove("+=");
+        var secondRead = service.Current;
+
+        Assert.Equal(4, secondRead.TabSize);
+        Assert.Equal(["=", "+="], secondRead.EnabledOperators);
     }
 
     [Fact]
@@ -47,8 +71,9 @@ public sealed class AlignSettingsServiceTests : IDisposable
 
         Assert.Throws<IOException>(() => service.Save(new AlignSettings { AutoAlign = true }));
 
-        Assert.Same(original, service.Current);
-        Assert.False(service.Current.AutoAlign);
+        var current = service.Current;
+        Assert.Equal(original.AutoAlign, current.AutoAlign);
+        Assert.Equal(original.EnabledOperators, current.EnabledOperators);
     }
 
     public void Dispose()

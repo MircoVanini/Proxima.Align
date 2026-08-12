@@ -49,7 +49,7 @@ internal sealed class AlignSettingsService
     /// <summary>
     /// Gets the current application settings.
     /// </summary>
-    public AlignSettings Current => _current;
+    public AlignSettings Current => _current.Copy();
 
     /// <summary>
     /// Loads the settings from the settings file.
@@ -96,6 +96,6 @@ internal sealed class AlignSettingsService
             Directory.CreateDirectory(settingsDirectory);
 
         File.WriteAllText(_settingsFilePath, JsonSerializer.Serialize(settings, JsonOptions));
-        _current = settings;
+        _current = settings.Copy();
     }
 }

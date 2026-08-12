@@ -26,4 +26,24 @@ public sealed class AlignSettingsTests
         Assert.True(updated.AlignComments);
         Assert.Equal(8, updated.TabSize);
     }
+
+    [Fact]
+    public void WithTabSize_DoesNotMutateOriginalSettings()
+    {
+        var original = new AlignSettings
+        {
+            EnabledOperators = ["=", "+="],
+            AlignComments = true,
+            TabSize = 4,
+        };
+
+        var updated = original.WithTabSize(8);
+        updated.EnabledOperators.Remove("+=");
+
+        Assert.Equal(4, original.TabSize);
+        Assert.Equal(["=", "+="], original.EnabledOperators);
+        Assert.Equal(8, updated.TabSize);
+        Assert.Equal(["="], updated.EnabledOperators);
+        Assert.True(updated.AlignComments);
+    }
 }
