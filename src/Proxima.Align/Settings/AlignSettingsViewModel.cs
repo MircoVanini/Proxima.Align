@@ -37,19 +37,19 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     private bool _opArrow;
     private bool _enableLog;
 
-    [DataMember] public bool EnableLog { get => _enableLog; set => SetProperty(ref _enableLog, value); }
-    [DataMember] public bool OpAssign { get => _opAssign; set => SetProperty(ref _opAssign, value); }
-    [DataMember] public bool OpPlusEq { get => _opPlusEq; set => SetProperty(ref _opPlusEq, value); }
-    [DataMember] public bool OpMinusEq { get => _opMinusEq; set => SetProperty(ref _opMinusEq, value); }
-    [DataMember] public bool OpMulEq { get => _opMulEq; set => SetProperty(ref _opMulEq, value); }
-    [DataMember] public bool OpDivEq { get => _opDivEq; set => SetProperty(ref _opDivEq, value); }
-    [DataMember] public bool OpModEq { get => _opModEq; set => SetProperty(ref _opModEq, value); }
-    [DataMember] public bool OpAndEq { get => _opAndEq; set => SetProperty(ref _opAndEq, value); }
-    [DataMember] public bool OpOrEq { get => _opOrEq; set => SetProperty(ref _opOrEq, value); }
-    [DataMember] public bool OpXorEq { get => _opXorEq; set => SetProperty(ref _opXorEq, value); }
-    [DataMember] public bool OpShlEq { get => _opShlEq; set => SetProperty(ref _opShlEq, value); }
-    [DataMember] public bool OpShrEq { get => _opShrEq; set => SetProperty(ref _opShrEq, value); }
-    [DataMember] public bool OpArrow { get => _opArrow; set => SetProperty(ref _opArrow, value); }
+    [DataMember] public bool EnableLog  { get => _enableLog;    set => SetProperty(ref _enableLog, value); }
+    [DataMember] public bool OpAssign   { get => _opAssign;     set => SetProperty(ref _opAssign, value); }
+    [DataMember] public bool OpPlusEq   { get => _opPlusEq;     set => SetProperty(ref _opPlusEq, value); }
+    [DataMember] public bool OpMinusEq  { get => _opMinusEq;    set => SetProperty(ref _opMinusEq, value); }
+    [DataMember] public bool OpMulEq    { get => _opMulEq;      set => SetProperty(ref _opMulEq, value); }
+    [DataMember] public bool OpDivEq    { get => _opDivEq;      set => SetProperty(ref _opDivEq, value); }
+    [DataMember] public bool OpModEq    { get => _opModEq;      set => SetProperty(ref _opModEq, value); }
+    [DataMember] public bool OpAndEq    { get => _opAndEq;      set => SetProperty(ref _opAndEq, value); }
+    [DataMember] public bool OpOrEq     { get => _opOrEq;       set => SetProperty(ref _opOrEq, value); }
+    [DataMember] public bool OpXorEq    { get => _opXorEq;      set => SetProperty(ref _opXorEq, value); }
+    [DataMember] public bool OpShlEq    { get => _opShlEq;      set => SetProperty(ref _opShlEq, value); }
+    [DataMember] public bool OpShrEq    { get => _opShrEq;      set => SetProperty(ref _opShrEq, value); }
+    [DataMember] public bool OpArrow    { get => _opArrow;      set => SetProperty(ref _opArrow, value); }
 
     private bool _spaceBefore;
     private bool _spaceAfter;
@@ -171,11 +171,17 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     private Task ExecuteRestoreAsync(object? parameter, CancellationToken ct)
     {
         LoadFromSettings(new AlignSettings());
+
         SaveStatusMessage = string.Empty;
-        HasSaveStatus = false;
+        HasSaveStatus     = false;
+
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Sets the save status message and updates the HasSaveStatus flag to indicate that a status message is present.
+    /// </summary>
+    /// <param name="message">The message to display as the save status.</param>
     private void SetSaveStatus(string message)
     {
         SaveStatusMessage = message;

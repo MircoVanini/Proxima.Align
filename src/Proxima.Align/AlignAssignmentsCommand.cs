@@ -21,10 +21,10 @@ internal class AlignAssignmentsCommand : Command
     private static readonly CommandConfiguration _commandConfiguration =
         new("%Proxima.Align.AlignAssignmentsCommand.DisplayName%")
         {
-            Placements = [],
-            Icon      = new(ImageMoniker.KnownValues.AlignLeft, IconSettings.IconAndText),
-            Shortcuts = [new CommandShortcutConfiguration(ModifierKey.ControlLeftAlt, Key.VK_OEM_5)],
-            EnabledWhen = ActivationConstraint.ClientContext(ClientContextKey.Shell.ActiveEditorContentType, ".+"),
+            Placements  = [],
+            Icon        = new(ImageMoniker.KnownValues.AlignLeft, IconSettings.IconAndText),
+            Shortcuts   = [new CommandShortcutConfiguration(ModifierKey.ControlLeftAlt, Key.VK_OEM_5)],
+            EnabledWhen = ActivationConstraint.EditorContentType("code"),
         };
 
     public override CommandConfiguration CommandConfiguration => _commandConfiguration;
@@ -175,6 +175,12 @@ internal class AlignAssignmentsCommand : Command
         }
     }
 
+    /// <summary>
+    /// Attempts to retrieve the active text view from the Visual Studio editor context.
+    /// </summary>
+    /// <param name="context">The client context representing the Visual Studio editor.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>The active text view snapshot, or null if it cannot be retrieved.</returns>
     private async Task<ITextViewSnapshot?> GetActiveTextViewAsync(IClientContext context,
                                                                          CancellationToken cancellationToken)
     {
@@ -199,12 +205,21 @@ internal class AlignAssignmentsCommand : Command
         }
     }
 
+    /// <summary>
+    /// Determines whether the provided error message indicates that the editor context is stale or invalid.
+    /// </summary>
+    /// <param name="message">The error message to evaluate.</param>
+    /// <returns><c>true</c> if the message indicates a stale or invalid editor context; otherwise, <c>false</c>.</returns>
     private static bool IsStaleEditorContext(string message)
         => message.Contains("Cannot subscribe to document, document is not open",
                             StringComparison.OrdinalIgnoreCase)
         || message.Contains("Document version is no longer available",
                             StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Logs a message to the Visual Studio debug output and optionally appends it to a log file in the user's application data directory.
+    /// </summary>
+    /// <param name="message">The message to log.</param>
     private void LogMessage(string message)
     {
         Debug.WriteLine(message);

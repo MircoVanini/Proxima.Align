@@ -23,7 +23,7 @@ internal sealed class AlignSettingsToolWindow : ToolWindow
     public AlignSettingsToolWindow(AlignSettingsService settingsService)
     {
         _viewModel = new AlignSettingsViewModel(settingsService);
-        Title = "Align Assignments – Settings";
+        Title      = "Align Assignments – Settings";
     }
 
     /// <summary>

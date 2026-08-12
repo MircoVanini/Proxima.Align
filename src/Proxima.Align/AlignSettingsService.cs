@@ -17,10 +17,11 @@ internal sealed class AlignSettingsService
     /// <summary>
     /// The full path to the settings file in the user's application data directory.
     /// </summary>
-    private static readonly string DefaultSettingsFilePath = 
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                     "Proxima.Align",
-                     SettingsFileName);
+    private static readonly string DefaultSettingsFilePath =
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Proxima.Align",
+            SettingsFileName);
 
     /// <summary>
     /// JSON serialization options configured for indented formatting.
@@ -28,19 +29,20 @@ internal sealed class AlignSettingsService
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>
-    /// The currently loaded settings instance.
+    /// The full path to the settings file.
     /// </summary>
     private readonly string _settingsFilePath;
 
     /// <summary>
-    /// The current settings instance, which may be updated by the Save method.
+    /// The current settings instance.
     /// </summary>
-    private volatile AlignSettings _current;
+    private AlignSettings _current;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AlignSettingsService"/> class,
+    /// Initializes a new instance of the <see cref="AlignSettingsService"/> class.
     /// </summary>
-    public AlignSettingsService() : this(DefaultSettingsFilePath)
+    public AlignSettingsService()
+        : this(DefaultSettingsFilePath)
     {
     }
 
@@ -101,19 +103,14 @@ internal sealed class AlignSettingsService
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        Interlocked.Exchange(ref _current, settings);
+        var settingsToPersist = settings.Copy();
+        var settingsDirectory = Path.GetDirectoryName(_settingsFilePath);
 
-        try
-        {
-            var settingsDirectory = Path.GetDirectoryName(_settingsFilePath);
-            if (!string.IsNullOrEmpty(settingsDirectory))
-                Directory.CreateDirectory(settingsDirectory);
+        if (!string.IsNullOrEmpty(settingsDirectory))
+            Directory.CreateDirectory(settingsDirectory);
 
-            File.WriteAllText(_settingsFilePath, JsonSerializer.Serialize(settings, JsonOptions));
-        }
-        catch 
-        { 
-            System.Diagnostics.Debug.WriteLine($"[Proxima.Align] Unable to save settings to {_settingsFilePath}");
-        }
+        File.WriteAllText(_settingsFilePath, JsonSerializer.Serialize(settingsToPersist, JsonOptions));
+
+        Interlocked.Exchange(ref _current, settingsToPersist);
     }
 }

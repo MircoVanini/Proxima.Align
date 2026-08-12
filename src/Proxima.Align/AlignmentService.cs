@@ -27,17 +27,16 @@ internal static class AlignmentService
     /// An array of aligned lines if alignment is possible (at least 2 lines with operators found),
     /// or <c>null</c> if alignment cannot be performed (empty input or fewer than 2 lines with operators).
     /// </returns>
-    public static string[]? AlignOperators(
-        string[] lines,
-        AlignSettings settings,
-        string? precedingText = null)
+    public static string[]? AlignOperators(string[] lines,
+                                           AlignSettings settings,
+                                           string? precedingText = null)
     {
         if (lines.Length == 0)
             return null;
 
-        var enabledOperators = AllOperators
-            .Where(settings.EnabledOperators.Contains)
-            .ToArray();
+        var enabledOperators = AllOperators.Where(settings.EnabledOperators.Contains)
+                                           .ToArray();
+
         int tabSize = settings.TabSize > 0 ? settings.TabSize : 4;
         var lexerState = new LexerState();
 
@@ -45,12 +44,11 @@ internal static class AlignmentService
         {
             foreach (var precedingLine in precedingText.Split('\n'))
             {
-                ParseLine(
-                    precedingLine.TrimEnd('\r'),
-                    [],
-                    alignComments: false,
-                    tabSize,
-                    lexerState);
+                ParseLine(precedingLine.TrimEnd('\r'),
+                          [],
+                          alignComments: false,
+                          tabSize,
+                          lexerState);
             }
         }
 
@@ -285,11 +283,10 @@ internal static class AlignmentService
             Right:           rightValue);
     }
 
-    private static bool TryMatchOperator(
-        string line,
-        int index,
-        string[] enabledOperators,
-        out string matchedOperator)
+    private static bool TryMatchOperator(string line,
+                                         int index,
+                                         string[] enabledOperators,
+                                         out string matchedOperator)
     {
         foreach (var candidate in enabledOperators)
         {
@@ -314,9 +311,21 @@ internal static class AlignmentService
         return false;
     }
 
+    /// <summary>
+    /// Determines if a character is adjacent to an operator, which affects whether a simple assignment operator '=' should be matched.
+    /// </summary>
+    /// <param name="value">The character to evaluate.</param>
+    /// <returns><c>true</c> if the character is adjacent to an operator; otherwise, <c>false</c>.</returns>
     private static bool IsAdjacentOperatorCharacter(char value)
         => value is '=' or '!' or '<' or '>' or '+' or '-' or '*' or '/' or '%' or '&' or '|' or '^';
 
+    /// <summary>
+    /// Counts the number of consecutive occurrences of a specified character in a string starting from a given index.
+    /// </summary>
+    /// <param name="text">The string to evaluate.</param>
+    /// <param name="start">The starting index within the string.</param>
+    /// <param name="value">The character to count.</param>
+    /// <returns>The number of consecutive occurrences of the specified character.</returns>
     private static int CountRun(string text, int start, char value)
     {
         int end = start;
@@ -325,12 +334,20 @@ internal static class AlignmentService
         return end - start;
     }
 
-    private static int SkipQuotedLiteral(
-        string line,
-        int index,
-        char delimiter,
-        bool verbatim,
-        out bool terminated)
+    /// <summary>
+    /// Skips over a quoted literal in a line of code, handling escape sequences and verbatim strings.
+    /// </summary>
+    /// <param name="line">The line of code to evaluate.</param>
+    /// <param name="index">The starting index within the line.</param>
+    /// <param name="delimiter">The character that delimits the quoted literal.</param>
+    /// <param name="verbatim">Indicates whether the string is a verbatim string.</param>
+    /// <param name="terminated">Outputs whether the quoted literal was properly terminated.</param>
+    /// <returns>The index immediately after the quoted literal.</returns>
+    private static int SkipQuotedLiteral(string line,
+                                         int index,
+                                         char delimiter,
+                                         bool verbatim,
+                                         out bool terminated)
     {
         while (index < line.Length)
         {
@@ -360,6 +377,9 @@ internal static class AlignmentService
         return index;
     }
 
+    /// <summary>
+    /// Represents the lexical state of the parser, tracking whether it is currently inside a block comment, verbatim string, or raw string literal.
+    /// </summary>
     private sealed class LexerState
     {
         public bool InBlockComment { get; set; }
