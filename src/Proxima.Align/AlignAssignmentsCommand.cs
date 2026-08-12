@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.VisualStudio.Extensibility;
 using Microsoft.VisualStudio.Extensibility.Commands;
 using Microsoft.VisualStudio.Extensibility.Editor;
+using StreamJsonRpc;
 
 namespace Proxima.Align;
 
@@ -23,6 +24,9 @@ internal class AlignAssignmentsCommand : Command
             Placements = [],
             Icon      = new(ImageMoniker.KnownValues.AlignLeft, IconSettings.IconAndText),
             Shortcuts = [new CommandShortcutConfiguration(ModifierKey.ControlLeftAlt, Key.VK_OEM_5)],
+            EnabledWhen = ActivationConstraint.ClientContext(
+                ClientContextKey.Shell.ActiveEditorContentType,
+                ".+"),
         };
 
     public override CommandConfiguration CommandConfiguration => _commandConfiguration;
@@ -61,7 +65,7 @@ internal class AlignAssignmentsCommand : Command
     {
         try
         {
-            var textView = await context.GetActiveTextViewAsync(cancellationToken);
+            using var textView = await GetActiveTextViewAsync(context, cancellationToken);
             if (textView is null) return;
 
             var selection = textView.Selection;
@@ -160,9 +164,46 @@ internal class AlignAssignmentsCommand : Command
                 editBatch => textView.Document.AsEditable(editBatch).Replace(blockRange, newText),
                 cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The command was cancelled while Visual Studio was resolving or editing the document.
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"[Proxima.Align] Error: {ex}");
         }
     }
+
+    private static async Task<ITextViewSnapshot?> GetActiveTextViewAsync(
+        IClientContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await context.GetActiveTextViewAsync(cancellationToken);
+        }
+        catch (RemoteInvocationException ex) when (IsStaleEditorContext(ex.Message))
+        {
+            Debug.WriteLine("[Proxima.Align] The active editor changed before its document could be opened.");
+            return null;
+        }
+        catch (ArgumentException ex) when (IsStaleEditorContext(ex.Message))
+        {
+            Debug.WriteLine("[Proxima.Align] The active document version is no longer available.");
+            return null;
+        }
+        catch (InvalidOperationException ex) when (IsStaleEditorContext(ex.Message))
+        {
+            Debug.WriteLine("[Proxima.Align] The active document closed before it could be opened.");
+            return null;
+        }
+    }
+
+    private static bool IsStaleEditorContext(string message)
+        => message.Contains(
+            "Cannot subscribe to document, document is not open",
+            StringComparison.OrdinalIgnoreCase)
+        || message.Contains(
+            "Document version is no longer available",
+            StringComparison.OrdinalIgnoreCase);
 }
