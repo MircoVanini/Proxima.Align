@@ -28,7 +28,7 @@ internal class ExtensionEntrypoint : Extension
         Metadata = new(
                 id:             "Proxima.Align.02d9493a-1406-4d2a-aa3b-2d686783003e",
                 version:        this.ExtensionAssemblyVersion,
-                publisherName:  "Proxima Software",
+                publisherName:  "proxima-software",
                 displayName:    "Proxima Align Assignments",
                 description:    "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks.")
         {

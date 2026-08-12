@@ -1,8 +1,8 @@
 <Project>
   <Import Project="Version.props" />
   <PropertyGroup>
-      <Company>Proxima Software</Company>
-      <Authors>Proxima Software</Authors>
+      <Company>proxima-software</Company>
+      <Authors>proxima-software</Authors>
       <Copyright>Copyright © Proxima Software 2026</Copyright>
       <Product>Proxima.Align</Product>
       <Description>Visual Studio 2026 extension for aligning assignment operators</Description>
