@@ -12,12 +12,14 @@ public sealed class AlignSettingsTests
             AutoAlign = true,
             AlignComments = true,
             TabSize = 8,
+            EnableLog = false
         };
 
         var updated = original.WithAlignmentPreferences(
             ["=", "+="],
             spaceBeforeOperator: false,
-            spaceAfterOperator: false);
+            spaceAfterOperator: false,
+            enableLog: true);
 
         Assert.Equal(["=", "+="], updated.EnabledOperators);
         Assert.False(updated.SpaceBeforeOperator);
@@ -25,6 +27,7 @@ public sealed class AlignSettingsTests
         Assert.True(updated.AutoAlign);
         Assert.True(updated.AlignComments);
         Assert.Equal(8, updated.TabSize);
+        Assert.True(updated.EnableLog);
     }
 
     [Fact]

@@ -26,19 +26,19 @@ internal class ExtensionEntrypoint : Extension
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
         Metadata = new(
-                id: "Proxima.Align.02d9493a-1406-4d2a-aa3b-2d686783003e",
-                version: this.ExtensionAssemblyVersion,
-                publisherName: "Proxima Software",
-                displayName: "Proxima Align Assignments",
-                description: "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks.")
+                id:             "Proxima.Align.02d9493a-1406-4d2a-aa3b-2d686783003e",
+                version:        this.ExtensionAssemblyVersion,
+                publisherName:  "Proxima Software",
+                displayName:    "Proxima Align Assignments",
+                description:    "Aligns assignment operators (=, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=, =>) in selected code blocks.")
         {
-            Preview = false,
-            MoreInfo = "https://github.com/MircoVanini/Proxima.Align",
-            License = "LICENSE.txt",
+            Preview      = false,
+            MoreInfo     = "https://github.com/MircoVanini/Proxima.Align",
+            License      = "LICENSE.txt",
             ReleaseNotes = "RELEASE-NOTES.txt",
-            Icon = "Assets/icon.png",
+            Icon         = "Assets/icon.png",
             PreviewImage = "Assets/preview.png",
-            Tags = ["alignment", "assignments", "formatting", "productivity"],
+            Tags         = ["alignment", "assignments", "formatting", "productivity"],
         },
     };
 

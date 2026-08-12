@@ -5,7 +5,9 @@
     <File Path="Version.props" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/Proxima.Align/Proxima.Align.csproj" />
+    <Project Path="src/Proxima.Align/Proxima.Align.csproj">
+      <Deploy Solution="Debug|*" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Proxima.Align.Tests/Proxima.Align.Tests.csproj" />

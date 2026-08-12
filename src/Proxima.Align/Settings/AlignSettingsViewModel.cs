@@ -35,7 +35,9 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     private bool _opShlEq;
     private bool _opShrEq;
     private bool _opArrow;
+    private bool _enableLog;
 
+    [DataMember] public bool EnableLog { get => _enableLog; set => SetProperty(ref _enableLog, value); }
     [DataMember] public bool OpAssign { get => _opAssign; set => SetProperty(ref _opAssign, value); }
     [DataMember] public bool OpPlusEq { get => _opPlusEq; set => SetProperty(ref _opPlusEq, value); }
     [DataMember] public bool OpMinusEq { get => _opMinusEq; set => SetProperty(ref _opMinusEq, value); }
@@ -96,6 +98,7 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
         OpArrow     = s.EnabledOperators.Contains("=>");
         SpaceBefore = s.SpaceBeforeOperator;
         SpaceAfter  = s.SpaceAfterOperator;
+        EnableLog   = s.EnableLog;
     }
 
     /// <summary>
@@ -105,6 +108,7 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
     private AlignSettings ToSettings()
     {
         var ops = new List<string>();
+
         if (OpAssign) ops.Add("=");
         if (OpPlusEq) ops.Add("+=");
         if (OpMinusEq) ops.Add("-=");
@@ -118,7 +122,7 @@ internal sealed class AlignSettingsViewModel : NotifyPropertyChangedObject
         if (OpShrEq) ops.Add(">>=");
         if (OpArrow) ops.Add("=>");
 
-        return _service.Current.WithAlignmentPreferences(ops, SpaceBefore, SpaceAfter);
+        return _service.Current.WithAlignmentPreferences(ops, SpaceBefore, SpaceAfter, EnableLog);
     }
 
     /// <summary>

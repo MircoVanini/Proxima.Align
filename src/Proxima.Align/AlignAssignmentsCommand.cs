@@ -24,9 +24,7 @@ internal class AlignAssignmentsCommand : Command
             Placements = [],
             Icon      = new(ImageMoniker.KnownValues.AlignLeft, IconSettings.IconAndText),
             Shortcuts = [new CommandShortcutConfiguration(ModifierKey.ControlLeftAlt, Key.VK_OEM_5)],
-            EnabledWhen = ActivationConstraint.ClientContext(
-                ClientContextKey.Shell.ActiveEditorContentType,
-                ".+"),
+            EnabledWhen = ActivationConstraint.ClientContext(ClientContextKey.Shell.ActiveEditorContentType, ".+"),
         };
 
     public override CommandConfiguration CommandConfiguration => _commandConfiguration;
@@ -66,10 +64,12 @@ internal class AlignAssignmentsCommand : Command
         try
         {
             using var textView = await GetActiveTextViewAsync(context, cancellationToken);
-            if (textView is null) return;
+            if (textView is null) 
+                return;
 
             var selection = textView.Selection;
-            if (selection.IsEmpty) return;
+            if (selection.IsEmpty) 
+                return;
 
             var document  = textView.Document;
             var fullText  = document.Text.CopyToString();
@@ -120,10 +120,11 @@ internal class AlignAssignmentsCommand : Command
             var blockText = fullText.Substring(startIdx, endIdx - startIdx);
             var lines     = blockText.Split('\n').Select(l => l.TrimEnd('\r')).ToArray();
 
-            Debug.WriteLine($"[Proxima.Align] docBase={docBase} selStart={selStart} selEnd={selEnd}");
-            Debug.WriteLine($"[Proxima.Align] startIdx={startIdx} endIdx={endIdx} lines={lines.Length}");
+            LogMessage($"[Proxima.Align] docBase={docBase} selStart={selStart} selEnd={selEnd}");
+            LogMessage($"[Proxima.Align] startIdx={startIdx} endIdx={endIdx} lines={lines.Length}");
+
             for (int i = 0; i < lines.Length; i++)
-                Debug.WriteLine($"[Proxima.Align]   line[{i}]: '{lines[i]}'");
+                LogMessage($"[Proxima.Align]   line[{i}]: '{lines[i]}'");
 
             // Read the tab size from the document (default 4)
             int tabSize = 4;
@@ -142,13 +143,14 @@ internal class AlignAssignmentsCommand : Command
 
             if (aligned is null)
             {
-                Debug.WriteLine($"[Proxima.Align] AlignOperators returned null (< 2 lines with operators?)");
+                LogMessage($"[Proxima.Align] AlignOperators returned null (< 2 lines with operators?)");
                 return;
             }
 
-            Debug.WriteLine($"[Proxima.Align] aligned:");
+            LogMessage($"[Proxima.Align] aligned:");
+
             for (int i = 0; i < aligned.Length; i++)
-                Debug.WriteLine($"[Proxima.Align]   aligned[{i}]: '{aligned[i]}'");
+                LogMessage($"[Proxima.Align]   aligned[{i}]: '{aligned[i]}'");
 
             var newText      = string.Join(lineEnding, aligned);
             var originalText = string.Join(lineEnding, lines);
@@ -169,13 +171,12 @@ internal class AlignAssignmentsCommand : Command
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Proxima.Align] Error: {ex}");
+            LogMessage($"[Proxima.Align] Error: {ex}");
         }
     }
 
-    private static async Task<ITextViewSnapshot?> GetActiveTextViewAsync(
-        IClientContext context,
-        CancellationToken cancellationToken)
+    private async Task<ITextViewSnapshot?> GetActiveTextViewAsync(IClientContext context,
+                                                                         CancellationToken cancellationToken)
     {
         try
         {
@@ -183,26 +184,44 @@ internal class AlignAssignmentsCommand : Command
         }
         catch (RemoteInvocationException ex) when (IsStaleEditorContext(ex.Message))
         {
-            Debug.WriteLine("[Proxima.Align] The active editor changed before its document could be opened.");
+            LogMessage("[Proxima.Align] The active editor changed before its document could be opened.");
             return null;
         }
         catch (ArgumentException ex) when (IsStaleEditorContext(ex.Message))
         {
-            Debug.WriteLine("[Proxima.Align] The active document version is no longer available.");
+            LogMessage("[Proxima.Align] The active document version is no longer available.");
             return null;
         }
         catch (InvalidOperationException ex) when (IsStaleEditorContext(ex.Message))
         {
-            Debug.WriteLine("[Proxima.Align] The active document closed before it could be opened.");
+            LogMessage("[Proxima.Align] The active document closed before it could be opened.");
             return null;
         }
     }
 
     private static bool IsStaleEditorContext(string message)
-        => message.Contains(
-            "Cannot subscribe to document, document is not open",
-            StringComparison.OrdinalIgnoreCase)
-        || message.Contains(
-            "Document version is no longer available",
-            StringComparison.OrdinalIgnoreCase);
+        => message.Contains("Cannot subscribe to document, document is not open",
+                            StringComparison.OrdinalIgnoreCase)
+        || message.Contains("Document version is no longer available",
+                            StringComparison.OrdinalIgnoreCase);
+
+    private void LogMessage(string message)
+    {
+        Debug.WriteLine(message);
+
+        if (!_settingsService.Current.EnableLog) return;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Proxima.Align");
+                Directory.CreateDirectory(logDir);
+                var logFile = Path.Combine(logDir, $"log_{DateTime.Now:yyyy-MM-dd}.txt");
+                var logEntry = $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}";
+                File.AppendAllText(logFile, logEntry);
+            }
+            catch { }
+        });
+    }
 }

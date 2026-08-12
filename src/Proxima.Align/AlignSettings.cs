@@ -58,22 +58,40 @@ internal sealed class AlignSettings
     /// </value>
     public int  TabSize { get; set; } = 4;
 
-    public AlignSettings WithAlignmentPreferences(
-        List<string> enabledOperators,
-        bool spaceBeforeOperator,
-        bool spaceAfterOperator)
+    /// <summary>
+    /// Gets or sets a value indicating whether logging is enabled for alignment operations.
+    /// </summary>
+    public bool EnableLog { get; set; } = false;
+
+    /// <summary>
+    /// Creates a new instance of <see cref="AlignSettings"/> with updated alignment preferences while preserving other settings.
+    /// </summary>
+    /// <param name="enabledOperators">The list of operators to enable for alignment.</param>
+    /// <param name="spaceBeforeOperator">Indicates whether a space should be inserted before the operator.</param>
+    /// <param name="spaceAfterOperator">Indicates whether a space should be inserted after the operator.</param>
+    /// <returns>A new <see cref="AlignSettings"/> instance with the specified alignment preferences.</returns>
+    public AlignSettings WithAlignmentPreferences(List<string> enabledOperators,
+                                                  bool spaceBeforeOperator,
+                                                  bool spaceAfterOperator,
+                                                  bool enableLog)
     {
         return new AlignSettings
         {
-            EnabledOperators = [.. enabledOperators],
-            AutoAlign = AutoAlign,
-            AlignComments = AlignComments,
+            EnabledOperators    = [.. enabledOperators],
+            AutoAlign           = AutoAlign,
+            AlignComments       = AlignComments,
             SpaceBeforeOperator = spaceBeforeOperator,
-            SpaceAfterOperator = spaceAfterOperator,
-            TabSize = TabSize,
+            SpaceAfterOperator  = spaceAfterOperator,
+            TabSize             = TabSize,
+            EnableLog           = enableLog,
         };
     }
 
+    /// <summary>
+    /// Creates a new instance of <see cref="AlignSettings"/> with an updated tab size while preserving other settings.
+    /// </summary>
+    /// <param name="tabSize">The new tab size to use.</param>
+    /// <returns>A new <see cref="AlignSettings"/> instance with the specified tab size.</returns>
     public AlignSettings WithTabSize(int tabSize)
     {
         var copy = Copy();
@@ -81,16 +99,21 @@ internal sealed class AlignSettings
         return copy;
     }
 
+    /// <summary>
+    /// Creates a deep copy of the current <see cref="AlignSettings"/> instance.
+    /// </summary>
+    /// <returns>A new <see cref="AlignSettings"/> instance that is a deep copy of the current instance.</returns>
     public AlignSettings Copy()
     {
         return new AlignSettings
         {
-            EnabledOperators = [.. EnabledOperators],
-            AutoAlign = AutoAlign,
-            AlignComments = AlignComments,
+            EnabledOperators    = [.. EnabledOperators],
+            AutoAlign           = AutoAlign,
+            AlignComments       = AlignComments,
             SpaceBeforeOperator = SpaceBeforeOperator,
-            SpaceAfterOperator = SpaceAfterOperator,
-            TabSize = TabSize,
+            SpaceAfterOperator  = SpaceAfterOperator,
+            TabSize             = TabSize,
+            EnableLog           = EnableLog
         };
     }
 }
